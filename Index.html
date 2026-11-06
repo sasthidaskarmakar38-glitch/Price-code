@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="দাম">
+<title>দামের কোড</title>
+<link rel="apple-touch-icon" id="ati">
+<link rel="icon" id="ico">
+<style>
+:root{--bg:#0f172a;--card:#1e293b;--ink:#f1f5f9;--mute:#94a3b8;--acc:#22c55e;--err:#f87171}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif}
+body{min-height:100vh;padding:max(14px,env(safe-area-inset-top)) 14px 24px;max-width:520px;margin:0 auto}
+h1{font-size:18px;margin:4px 0 12px;display:flex;justify-content:space-between;align-items:center}
+h1 button{background:none;border:0;color:var(--mute);font-size:22px;padding:4px 8px}
+.card{background:var(--card);border-radius:18px;padding:16px;margin-bottom:12px}
+input#code{width:100%;font-size:34px;letter-spacing:4px;text-transform:uppercase;text-align:center;background:#0b1220;color:var(--ink);border:2px solid #334155;border-radius:14px;padding:12px}
+input#code:focus{outline:none;border-color:var(--acc)}
+#out{font-size:64px;font-weight:800;text-align:center;margin:10px 0 0;min-height:80px;line-height:80px;color:var(--acc);font-variant-numeric:tabular-nums}
+#out.err{font-size:20px;color:var(--err);line-height:1.4;padding-top:14px}
+#out small{font-size:30px;color:var(--mute);font-weight:600}
+#src{text-align:center;color:var(--mute);font-size:13px;min-height:18px}
+.btn{width:100%;border:0;border-radius:14px;padding:15px;font-size:17px;font-weight:700;background:var(--acc);color:#052e16}
+.btn.stop{background:#ef4444;color:#fff}
+.btn.alt{background:#334155;color:var(--ink);font-size:14px;padding:10px;width:auto}
+#cam{display:none}
+#cam.on{display:block}
+#vwrap{position:relative;width:100%;background:#000;border-radius:14px;overflow:hidden;aspect-ratio:4/3}
+video{width:100%;height:100%;object-fit:contain;display:block}
+#box{position:absolute;left:12%;width:76%;top:35%;height:30%;border:3px solid var(--acc);border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.45);pointer-events:none}
+#st{text-align:center;color:var(--mute);font-size:13px;margin:8px 0 0;min-height:18px}
+.row{display:flex;gap:8px;margin-top:8px;justify-content:center}
+#set{display:none}
+#set.on{display:block}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:10px 0}
+.grid label{display:flex;flex-direction:column;align-items:center;font-size:13px;color:var(--mute);gap:4px}
+.grid input{width:100%;font-size:22px;text-align:center;text-transform:uppercase;background:#0b1220;color:var(--ink);border:2px solid #334155;border-radius:10px;padding:6px 0}
+</style>
+</head>
+<body>
+<h1><span>🏷️ দামের কোড</span><button id="gear" aria-label="সেটিংস">⚙️</button></h1>
+
+<div class="card">
+  <input id="code" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="কোড লিখুন (যেমন AEK)">
+  <div id="out"></div>
+  <div id="src"></div>
+</div>
+
+<div class="card">
+  <button class="btn" id="scanBtn">📷 ক্যামেরা দিয়ে স্ক্যান</button>
+  <div id="cam">
+    <div style="height:10px"></div>
+    <div id="vwrap"><video id="v" playsinline muted autoplay></video><div id="box"></div></div>
+    <div id="st"></div>
+    <div class="row"><button class="btn alt" id="torch" style="display:none">🔦 টর্চ</button></div>
+  </div>
+</div>
+
+<div class="card" id="set">
+  <b>কোড সেটিংস</b>
+  <div class="grid" id="grid"></div>
+  <div class="row"><button class="btn alt" id="save">সেভ</button><button class="btn alt" id="reset">ডিফল্ট</button></div>
+  <div id="setmsg" style="text-align:center;color:var(--mute);font-size:13px;margin-top:8px"></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const DEF={M:1,A:2,N:3,I:4,K:5,H:6,O:7,U:8,S:9,E:0};
+let MAP=(()=>{try{const s=JSON.parse(localStorage.getItem('pcmap'));if(s&&Object.keys(s).length==10)return s}catch(e){}return {...DEF}})();
+
+/* icon */
+(()=>{const c=document.createElement('canvas');c.width=c.height=192;const x=c.getContext('2d');
+x.fillStyle='#0f172a';x.fillRect(0,0,192,192);x.fillStyle='#22c55e';x.font='bold 120px sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText('₹',96,104);
+const u=c.toDataURL('image/png');$('ati').href=u;$('ico').href=u})();
+
+/* decode */
+function decode(s){
+  s=(s||'').toUpperCase().replace(/[^A-Z]/g,'');
+  if(!s)return null;
+  let o='';
+  for(const ch of s){ if(!(ch in MAP))return{err:ch}; o+=MAP[ch]; }
+  return{val:o.replace(/^0+(?=\d)/,''),letters:s};
+}
+function show(r,src){
+  const out=$('out');
+  out.className='';
+  if(!r){out.innerHTML='';$('src').textContent='';return}
+  if(r.err){out.className='err';out.textContent='"'+r.err+'" কোডে নেই';$('src').textContent='';return}
+  out.innerHTML=r.val+'<small>/-</small>';
+  $('src').textContent=src||'';
+}
+$('code').addEventListener('input',e=>{show(decode(e.target.value),'টাইপ করা')});
+
+/* settings */
+function buildGrid(){
+  const inv={};for(const k in MAP)inv[MAP[k]]=k;
+  $('grid').innerHTML='';
+  for(let d=0;d<10;d++){
+    const l=document.createElement('label');
+    l.innerHTML='<span>'+d+'</span><input maxlength="1" data-d="'+d+'" value="'+(inv[d]||'')+'">';
+    $('grid').appendChild(l);
+  }
+}
+$('gear').onclick=()=>{$('set').classList.toggle('on');buildGrid()};
+$('save').onclick=()=>{
+  const m={};const seen=new Set();
+  for(const i of $('grid').querySelectorAll('input')){
+    const v=i.value.toUpperCase().replace(/[^A-Z]/g,'');
+    if(!v||seen.has(v)){$('setmsg').textContent='প্রতিটি সংখ্যার জন্য আলাদা অক্ষর দিন';return}
+    seen.add(v);m[v]=+i.dataset.d;
+  }
+  MAP=m;localStorage.setItem('pcmap',JSON.stringify(m));
+  $('setmsg').textContent='সেভ হয়েছে ✓';updateWhitelist();show(decode($('code').value),'টাইপ করা');
+};
+$('reset').onclick=()=>{MAP={...DEF};localStorage.removeItem('pcmap');buildGrid();$('setmsg').textContent='ডিফল্ট ফিরেছে';updateWhitelist();show(decode($('code').value),'টাইপ করা')};
+
+/* camera + OCR */
+let stream=null,scanning=false,worker=null,detector=null,lastTok=null,streak=0,shown=null;
+const v=$('v'),cv=document.createElement('canvas'),cx=cv.getContext('2d',{willReadFrequently:true});
+const st=t=>$('st').textContent=t;
+
+function updateWhitelist(){
+  if(worker)worker.setParameters({tessedit_char_whitelist:Object.keys(MAP).join('')}).catch(()=>{});
+}
+function loadScript(src){return new Promise((res,rej)=>{const s=document.createElement('script');s.src=src;s.onload=res;s.onerror=rej;document.head.appendChild(s)})}
+
+async function initOCR(){
+  if('TextDetector' in window){
+    try{detector=new TextDetector();await detector.detect(document.createElement('canvas').constructor===HTMLCanvasElement?cv:cv).catch(()=>{});return}catch(e){detector=null}
+  }
+  st('OCR লোড হচ্ছে… (প্রথমবার ইন্টারনেট লাগবে)');
+  if(!window.Tesseract)await loadScript('https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js');
+  worker=await Tesseract.createWorker('eng');
+  await worker.setParameters({tessedit_char_whitelist:Object.keys(MAP).join(''),tessedit_pageseg_mode:'7'});
+}
+
+function grab(){
+  const vw=v.videoWidth,vh=v.videoHeight;
+  const sx=vw*.12,sw=vw*.76,sy=vh*.35,sh=vh*.30;
+  const w=Math.min(520,Math.round(sw)),h=Math.round(sh*w/sw);
+  cv.width=w;cv.height=h;
+  cx.drawImage(v,sx,sy,sw,sh,0,0,w,h);
+  const im=cx.getImageData(0,0,w,h),d=im.data;
+  let mn=255,mx=0;
+  for(let i=0;i<d.length;i+=4){const g=(d[i]*.3+d[i+1]*.59+d[i+2]*.11)|0;d[i]=g;if(g<mn)mn=g;if(g>mx)mx=g}
+  const k=255/Math.max(1,mx-mn);
+  for(let i=0;i<d.length;i+=4){const g=Math.max(0,Math.min(255,((d[i]-mn)*k)|0));d[i]=d[i+1]=d[i+2]=g}
+  cx.putImageData(im,0,0);
+}
+function pick(text){
+  const t=(text||'').toUpperCase().split(/[^A-Z]+/).filter(x=>x.length>=2&&[...x].every(c=>c in MAP));
+  t.sort((a,b)=>b.length-a.length);
+  return t[0]||null;
+}
+async function loop(){
+  while(scanning){
+    if(v.videoWidth){
+      try{
+        grab();
+        let text='';
+        if(detector){const r=await detector.detect(cv);text=r.map(x=>x.rawValue).join(' ')}
+        else{const r=await worker.recognize(cv);text=r.data.text}
+        const tok=pick(text);
+        if(tok){
+          streak=(tok===lastTok)?streak+1:1;lastTok=tok;
+          const need=detector?1:2;
+          if(streak>=need&&tok!==shown){
+            shown=tok;$('code').value=tok;show(decode(tok),'📷 স্ক্যান');
+            if(navigator.vibrate)navigator.vibrate(60);
+            st('পাওয়া গেছে: '+tok);
+          }
+        }else{streak=0;lastTok=null;if(!shown)st('কোডটা সবুজ বক্সের ভেতরে ধরুন')}
+      }catch(e){st('ত্রুটি: '+(e.message||e))}
+    }
+    await new Promise(r=>setTimeout(r,60));
+  }
+}
+async function startScan(){
+  try{
+    $('scanBtn').disabled=true;
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});
+    v.srcObject=stream;await v.play();
+    $('vwrap').style.aspectRatio=(v.videoWidth||4)+'/'+(v.videoHeight||3);
+    $('cam').classList.add('on');
+    const tr=stream.getVideoTracks()[0],cap=tr.getCapabilities?tr.getCapabilities():{};
+    $('torch').style.display=cap.torch?'inline-block':'none';
+    $('scanBtn').textContent='⏹ স্ক্যান বন্ধ করুন';$('scanBtn').classList.add('stop');
+    $('scanBtn').disabled=false;
+    scanning=true;shown=null;lastTok=null;streak=0;
+    if(!worker&&!detector){await initOCR()}
+    st('কোডটা সবুজ বক্সের ভেতরে ধরুন');
+    loop();
+  }catch(e){
+    $('scanBtn').disabled=false;scanning=false;
+    st('');alert('ক্যামেরা চালু হয়নি: '+(e.message||e)+'\n\nHTTPS লিংক থেকে খুলুন এবং ক্যামেরার অনুমতি দিন।');
+    stopScan();
+  }
+}
+function stopScan(){
+  scanning=false;
+  if(stream){stream.getTracks().forEach(t=>t.stop());stream=null}
+  v.srcObject=null;$('cam').classList.remove('on');
+  $('scanBtn').textContent='📷 ক্যামেরা দিয়ে স্ক্যান';$('scanBtn').classList.remove('stop');
+}
+$('scanBtn').onclick=()=>scanning?stopScan():startScan();
+let torchOn=false;
+$('torch').onclick=async()=>{
+  try{torchOn=!torchOn;await stream.getVideoTracks()[0].applyConstraints({advanced:[{torch:torchOn}]})}catch(e){}
+};
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&scanning)stopScan()});
+</script>
+</body>
+</html>
